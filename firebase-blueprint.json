@@ -1,0 +1,147 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user in the system (student, admin, moderator, editor)",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "admin", "moderator", "editor"] },
+        "isPremium": { "type": "boolean" },
+        "createdAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["email", "role", "createdAt", "isPremium"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "A course offering",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "level": { "type": "string", "enum": ["A-Level", "IB", "IGCSE", "HKDSE", "EDEXCEL", "AQA", "CAMBRIDGE", "Other"] },
+        "subject": { "type": "string", "enum": ["Chemistry", "Biology", "Physics"] },
+        "isPremiumOnly": { "type": "boolean" },
+        "price": { "type": "number" },
+        "thumbnail": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "description", "level", "subject", "isPremiumOnly", "createdAt", "updatedAt"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Learning material (video, pdf, presentation, notes)",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["video", "pdf", "presentation", "note", "ppt", "link"] },
+        "url": { "type": "string" },
+        "isPremiumOnly": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["courseId", "title", "type", "url", "isPremiumOnly", "createdAt"]
+    },
+    "Progress": {
+      "title": "Progress",
+      "description": "Tracks a user's completion of a specific material",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "materialId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "completedAt": { "type": "number" }
+      },
+      "required": ["userId", "materialId", "courseId", "completed"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Contextual Q&A on materials",
+      "type": "object",
+      "properties": {
+        "materialId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["materialId", "userId", "userName", "text", "createdAt"]
+    },
+    "SiteSettings": {
+      "title": "Site Settings",
+      "description": "Global CMS settings for the site content (e.g. Home page)",
+      "type": "object",
+      "properties": {
+        "heroTitle": { "type": "string" },
+        "heroSubtitle": { "type": "string" },
+        "foundersTitle": { "type": "string" },
+        "foundersDescription": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["heroTitle", "heroSubtitle", "foundersTitle", "foundersDescription", "updatedAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Broadcast alerts and notifications to all users",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "warning", "success"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "message", "type", "createdAt"]
+    },
+    "UserStats": {
+      "title": "User Stats",
+      "description": "Statistics for gamification like points and streaks",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "points": { "type": "number" },
+        "currentStreak": { "type": "number" },
+        "longestStreak": { "type": "number" },
+        "lastActiveDate": { "type": "string" }
+      },
+      "required": ["userId", "points", "currentStreak", "longestStreak", "lastActiveDate"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles and roles"
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/Course" },
+      "description": "Course information"
+    },
+    "/materials/{materialId}": {
+      "schema": { "$ref": "#/entities/Material" },
+      "description": "Learning materials associated with courses"
+    },
+    "/progress/{progressId}": {
+      "schema": { "$ref": "#/entities/Progress" },
+      "description": "Student progress tracking"
+    },
+    "/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/Comment" },
+      "description": "Material contextual discussion/Q&A"
+    },
+    "/siteSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Global CMS settings for the site content"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Broadcast alerts and notifications to all users"
+    },
+    "/userStats/{userId}": {
+      "schema": { "$ref": "#/entities/UserStats" },
+      "description": "Gamification stats for a user"
+    }
+  }
+}

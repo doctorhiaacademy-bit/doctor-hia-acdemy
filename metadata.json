@@ -1,0 +1,8 @@
+{
+  "name": "Dr. HIA Academy",
+  "description": "Online learning platform for high school Science subjects (A-Level, IB, IGCSE) featuring video lectures, notes, premium courses, and an AI helper.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

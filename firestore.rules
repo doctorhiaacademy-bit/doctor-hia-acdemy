@@ -1,0 +1,169 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Basic helper functions
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Auth token checks
+    function userEmail() { return request.auth.token.email; }
+    function isVerified() { return request.auth.token.email_verified == true; }
+    function isRootAdmin() { return isSignedIn() && (userEmail() == 'doctorhiaacademy@gmail.com'); }
+    
+    // Check if user document says they are admin
+    function isAdmin() {
+      return isRootAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+    
+    // Editor or Admin can write content
+    function isStaff() {
+      return isAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'moderator', 'editor']);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.size() >= 4 &&
+               data.email is string && data.email.size() <= 200 &&
+               data.role is string &&
+               data.isPremium is bool &&
+               data.createdAt is number;
+      }
+      
+      // Anyone can read user profiles, or restrict? Let's restrict to owner or admin.
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      // For the admin dashboard to list users
+      allow list: if isAdmin();
+      
+      // Allow users to create their own profile upon signup. They MUST be student & not premium.
+      allow create: if isValidId(userId) && isOwner(userId) && isValidUser(incoming()) &&
+                       (
+                         (isRootAdmin() && incoming().role == 'admin' && incoming().isPremium == true) ||
+                         (incoming().role == 'student' && incoming().isPremium == false)
+                       );
+                       
+      // Admins can update roles/premium status. Users can update their own displayName/photoURL.
+      allow update: if isValidId(userId) && (
+        (isAdmin() && isValidUser(incoming())) ||
+        (isOwner(userId) && isValidUser(incoming()) && incoming().role == existing().role && incoming().isPremium == existing().isPremium)
+      );
+      
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+    
+    match /courses/{courseId} {
+      function isValidCourse(data) {
+        return data.title is string && data.title.size() <= 200 &&
+               data.description is string && data.description.size() <= 5000 &&
+               data.level is string &&
+               data.subject is string &&
+               data.isPremiumOnly is bool;
+      }
+      
+      allow read: if true; // Publicly readable, app filters if premiumOnly
+      allow create: if isValidId(courseId) && isStaff() && isValidCourse(incoming());
+      allow update: if isValidId(courseId) && isStaff() && isValidCourse(incoming());
+      allow delete: if isValidId(courseId) && isAdmin();
+    }
+    
+    match /materials/{materialId} {
+      function isValidMaterial(data) {
+        return data.courseId is string &&
+               data.title is string && data.title.size() <= 200 &&
+               data.type is string &&
+               data.url is string && data.url.size() <= 2000 &&
+               data.isPremiumOnly is bool;
+      }
+      
+      allow read: if isSignedIn(); // We might restrict inside the app or logic here. Let's allow read if signed in, but maybe need a check for premium
+      // For now let's just make it signed in.
+      allow create: if isValidId(materialId) && isStaff() && isValidMaterial(incoming());
+      allow update: if isValidId(materialId) && isStaff() && isValidMaterial(incoming());
+      allow delete: if isValidId(materialId) && isStaff();
+    }
+    match /progress/{progressId} {
+      function isValidProgress(data) {
+        return data.userId is string && data.userId.size() <= 128 &&
+               data.materialId is string && data.materialId.size() <= 128 &&
+               data.courseId is string && data.courseId.size() <= 128 &&
+               data.completed is bool &&
+               (data.userName == null || (data.userName is string && data.userName.size() <= 100)) &&
+               data.completedAt is number;
+      }
+      
+      allow read, list: if isSignedIn();
+      
+      allow create: if isValidId(progressId) && isSignedIn() && isOwner(incoming().userId) && isValidProgress(incoming());
+      allow update: if isValidId(progressId) && isSignedIn() && isOwner(existing().userId) && isOwner(incoming().userId) && isValidProgress(incoming());
+      allow delete: if isValidId(progressId) && isSignedIn() && (isOwner(existing().userId) || isAdmin());
+    }
+    
+    match /comments/{commentId} {
+      function isValidComment(data) {
+        return data.userId is string && data.userId.size() <= 128 &&
+               data.materialId is string && data.materialId.size() <= 128 &&
+               data.userName is string && data.userName.size() <= 100 &&
+               data.text is string && data.text.size() <= 2000 &&
+               data.createdAt is number;
+      }
+      
+      allow read, list: if isSignedIn();
+      
+      allow create: if isValidId(commentId) && isSignedIn() && isOwner(incoming().userId) && isValidComment(incoming());
+      allow update: if isValidId(commentId) && isSignedIn() && isOwner(existing().userId) && isOwner(incoming().userId) && isValidComment(incoming());
+      allow delete: if isValidId(commentId) && isSignedIn() && (isOwner(existing().userId) || isAdmin());
+    }
+    
+    match /siteSettings/{settingId} {
+      function isValidSetting(data) {
+        return data.heroTitle is string && data.heroTitle.size() <= 200 &&
+               data.heroSubtitle is string && data.heroSubtitle.size() <= 500 &&
+               data.foundersTitle is string && data.foundersTitle.size() <= 200 &&
+               data.foundersDescription is string && data.foundersDescription.size() <= 2000 &&
+               data.updatedAt is number;
+      }
+      
+      allow read, list: if true;
+      allow create: if isValidId(settingId) && isAdmin() && isValidSetting(incoming());
+      allow update: if isValidId(settingId) && isAdmin() && isValidSetting(incoming());
+      allow delete: if false;
+    }
+    
+    match /notifications/{notificationId} {
+      function isValidNotification(data) {
+        return data.title is string && data.title.size() <= 200 &&
+               data.message is string && data.message.size() <= 2000 &&
+               data.type is string &&
+               data.createdAt is number;
+      }
+      
+      allow read, list: if true;
+      allow create: if isValidId(notificationId) && isStaff() && isValidNotification(incoming());
+      allow update: if isValidId(notificationId) && isStaff() && isValidNotification(incoming());
+      allow delete: if isValidId(notificationId) && isStaff();
+    }
+    
+    match /userStats/{userId} {
+      function isValidUserStats(data) {
+        return data.userId is string && data.userId.size() <= 128 &&
+               data.points is number &&
+               data.currentStreak is number &&
+               data.longestStreak is number &&
+               data.lastActiveDate is string && data.lastActiveDate.size() <= 20;
+      }
+      
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin() || isStaff());
+      allow list: if true;
+      allow create: if isValidId(userId) && isSignedIn() && isOwner(userId) && isValidUserStats(incoming());
+      allow update: if isValidId(userId) && isSignedIn() && isOwner(userId) && isValidUserStats(incoming());
+      allow delete: if false;
+    }
+  }
+}
